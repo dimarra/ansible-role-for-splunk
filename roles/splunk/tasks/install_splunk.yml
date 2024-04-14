@@ -1,21 +1,26 @@
 ---
 #  This task should be used for fresh installations of Splunk, refer to upgrade_splunk.yml for upgrades
+- name: Install Required Packages
+  include_tasks: prereqs.yml
+
 - name: Block for non-root splunk user setup
   block:
     - name: Add nix splunk group
       group:
-             name: "{{ splunk_nix_group }}"
-             state: present
-      become: yes
+        name: "{{ splunk_nix_group }}"
+        state: present
+        local: "{{ local_os_group }}"
+      become: true
 
     - name: Add nix splunk user
       user:
-            name: "{{ splunk_nix_user }}"
-            groups: "{{ splunk_nix_group }}"
-            home: "{{ splunk_home }}"
-            state: present
-            shell: /bin/bash
-      become: yes
+        name: "{{ splunk_nix_user }}"
+        group: "{{ splunk_nix_group }}"
+        home: "{{ splunk_home }}"
+        state: present
+        shell: /bin/bash
+        local: "{{ local_os_user }}"
+      become: true
 
     - name: Allow splunk user to read /var/log
       include_tasks: configure_facl.yml
@@ -43,18 +48,28 @@
 
 - name: Include configure user-seed task
   include_tasks: configure_user-seed.yml
-  when: 
-    - splunk_user_seed
+  when:
     - splunk_admin_password != 'undefined'
 
 - name: Include configure default authentication.conf for AD authentication and admin role mapping
   include_tasks: configure_authentication.yml
-  when: 
+  when:
     - splunk_configure_authentication
     - ad_bind_password != 'undefined'
 
+- name: Include custom management port task
+  include_tasks: configure_custom_mgmt_port.yml
+  when: splunkd_port != '8089'
+
+- name: Include disable management port task
+  include_tasks: configure_disable_mgmt_port.yml
+  when: splunk_disable_mgmt_port
+
+- name: Include accept license task
+  include_tasks: splunk_license_accept.yml
+
+- name: Enable boot start
+  include_tasks: configure_splunk_boot.yml
+
 - name: Include post-install tasks
   include_tasks: post_install.yml
-
-- name: Enable boot start and accept license
-  include_tasks: configure_splunk_boot.yml
